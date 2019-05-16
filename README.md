@@ -1,6 +1,6 @@
 # start-elastic
 
-A simple tutorial to begin with Elasticsearch, Logstash, Kibana combined with Confluent Kafka.
+This is a simple tutorial to begin with Elasticsearch, Logstash and Kibana combined with Confluent Kafka.
 
 ## Prerequisites
 
@@ -9,11 +9,9 @@ A simple tutorial to begin with Elasticsearch, Logstash, Kibana combined with Co
 - HTTPIE
 
 ## Installations
-In this tutorial, we will install services with Debian Package. If you are under Linux or Debian, follow the following steps to install Elasticsearch, Kibana and Logstash.
+In this tutorial, we will install services with the Debian package manager. If you are using Debian or Ubuntu, follow the following steps to install Elasticsearch, Kibana and Logstash.
 
 For other operating systems or installation methods, please refer to this [page](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html) for Elasticsearch installation; this [page](https://www.elastic.co/guide/en/kibana/current/install.html) for installing Kibana and this [page](https://www.elastic.co/guide/en/logstash/current/installing-logstash.html) for Logstash.
-
-Please adapt the command lines used in this tutorial if you have different installations.
 
 
 ```bash
@@ -39,7 +37,7 @@ $ sudo apt-get install logstash
 
 ## Start services
 
-How to start and stop Kibana and Logstash services depends on whether your system uses systemd or SysV init.
+To start and stop Kibana and Logstash services depends on whether your system uses systemd or SysV init.
 Check which one is used by your system with this following command:
 ```bash
 $ ps -p 1
@@ -62,11 +60,11 @@ sudo -i service logstash start
 
 Normally, if you installed the service with above commands you will get a configuration like:
 
-|Service|Adresses|
-|-----------------|-----------------|
-|Elasticsearch|localhost:9200|
-|Kibana|localhost:5601|
-|Logstash|localhost:9600|
+| Service       | Adresses       |
+| ------------- | -------------- |
+| Elasticsearch | localhost:9200 |
+| Kibana        | localhost:5601 |
+| Logstash      | localhost:9600 |
 
 Try to hit those adresses to verify if you have a functional environment.
 ```bash
@@ -80,7 +78,7 @@ $ http :5601/
 $ http :9600/
 ```
 
-Basically, you must obtain results like:
+You should obtain a results looking like:
 
 ```json
 clairehuang@clairehuang-VirtualBox:~$ http :9200
@@ -186,8 +184,8 @@ $ kafka-console-producer --broker-list locahost:9092 --topic test
 ```
 
 ### Step 3: Search messages in Elasticsearch
-Basically, your logstash plugin is already running. When you finished writing to Kafka, your data will be already searchable in Elasticsearch.
-Try the following command to check that you have successfully ingest Kafka data to Elasticsearch with Logstash:
+Your logstash plugin is already running. When you finished writing to Kafka, your data will be already searchable in Elasticsearch.
+Try the following command to check that you have successfully ingested Kafka data to Elasticsearch with Logstash:
 ```bash
 $ http :9200/_cat/indices
 ```
@@ -196,7 +194,7 @@ You may notice that your data have been successfully indexed to **kafka-1**. Now
 ```bash
 $ http :9200/kafka-1/_search?q=pikachu
 ```
-Your result must look like:
+Your result should look like:
 ```http
 clairehuang@clairehuang-VirtualBox:~$ http :9200/_cat/indices
 HTTP/1.1 200 OK
@@ -215,7 +213,7 @@ If you want to pass several key words at time, just put a coma between your sear
 ```bash
 $ http :9200/kafka-1/_search?q=pikachu,hello
 ```
-You will know got two responses: one that matches "hello" and the other for "pikachu".
+You will now get two responses: one that matches "hello" and the other for "pikachu".
 
 ```json
 clairehuang@clairehuang-VirtualBox:~$ http :9200/kafka-1/_search?q=pikachu,hello
