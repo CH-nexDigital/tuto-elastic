@@ -1,16 +1,17 @@
 # start-elastic
 
-A simple tutorial for Elasticsearch. This tutorial will show a simple use case of Elasticsearch, combined with Kafka.
+A simple tutorial to begin with Elasticsearch, Logstash, Kibana combined with Confluent Kafka.
 
 ## Prerequisites
 
 - Java 8
-- Kafka
+- Confluent Kafka
+- HTTPIE
 
 ## Installations
-In this tutorial, we will install services with Debian Package. If you are under Linux or Debian, follow the following steps to install Elasticsearch, Kibana and Logstash. 
+In this tutorial, we will install services with Debian Package. If you are under Linux or Debian, follow the following steps to install Elasticsearch, Kibana and Logstash.
 
-For other operating systems or installation methods, please refer to this [page](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html) for Elasticsearch installation; this [page](https://www.elastic.co/guide/en/kibana/current/install.html) for installing Kibana and this [page]() for Logstash.
+For other operating systems or installation methods, please refer to this [page](https://www.elastic.co/guide/en/elasticsearch/reference/current/install-elasticsearch.html) for Elasticsearch installation; this [page](https://www.elastic.co/guide/en/kibana/current/install.html) for installing Kibana and this [page](https://www.elastic.co/guide/en/logstash/current/installing-logstash.html) for Logstash.
 
 Please adapt the command lines used in this tutorial if you have different installations.
 
@@ -56,6 +57,34 @@ sudo -i service elasticsearch start
 sudo -i serivce kibana start
 sudo -i service logstash start
 ```
+
+## Use the services
+
+Normally, if you installed the service with above commands you will get a configuration like:
+
+|Service|Adresses|
+|-----------------|-----------------|
+|Elasticsearch|localhost:9200|
+|Kibana|localhost:5601|
+|Logstash|localhost:9600|
+
+Try to hit those adresses to verify if you have a functional environment.
+```bash
+# Ping Elasticsearch
+$ http :9200/
+
+# Ping Kibana
+$ http :5601/
+
+# Ping Logstash
+$ http :9600/
+```
+
+Basically, you must obtain results like:
+
+![Elasticsearch](img/elasticsearch.PNG?=true)
+![Kibana](img/kibana.PNG?raw=true)
+![Logstash](img/logstash.PNG?raw=true)
 
 ## Stop services
 ```bash
