@@ -17,6 +17,7 @@ This is a simple tutorial to begin with Elasticsearch, Logstash and Kibana combi
       - [Multiple keywords search](#multiple-keywords-search)
   - [Example 2: Ingest data to Kafka](#example-2-ingest-data-to-kafka)
       - [Handling multiple pipelines](#handling-multiple-pipelines)
+  - [Visualization on Kibana](#visualization-on-kibana)
   - [Stop services](#stop-services)
 
 ## Prerequisites
@@ -354,6 +355,7 @@ $ git clone https://github.com/nexDchuang/tuto-elastic
 $ cd tuto-elastic/data
 $ touch sincedb
 ```
+
 As above, create a new configuration file at **/etc/logstash/conf.d/logstash-kafka-airports.conf**:
 ```apache
 input {
@@ -389,13 +391,59 @@ output {
 >Don't forget to modify **path** and **sincedb_path** to the path where you cloned the repository.
 
 #### Handling multiple pipelines
-Usually, when you install Logstash there is only one pipeline configured. If you got multiple flows, you can handle them using one pipeline by injecting conditions in the configuration file. If you do not make distinction in your configuration file while using a single pipeline, your data will be mixed up and you can find some inexpected behaviors. 
+Usually, when you install Logstash there is only one pipeline for all configuration files in **/etc/logstash/conf.d** repository. If you got multiple flows, you can handle them using one configuration file and defining conditions. If you put several configuration files without any additional configurations, your data will be mixed up and you can will find unexpected behaviors. The following shows that if you put all your flows in one pipeline without any distinction, you can get your CSV file data in the **kafka-1** index of the previous example. In addition to that, your data can be corrupted with mis-matching fields and values.
 
-For example, if you restart your logstash service right now (**do not do that!**), you can have your data of flow A in you flow B and vice versa.
+```http
+clairehuang@clairehuang-VirtualBox:~/Desktop$ http :9200/_cat/indices
+HTTP/1.1 200 OK
+content-encoding: gzip
+content-length: 151
+content-type: text/plain; charset=UTF-8
+
+green  open .kibana_1            mtyWm9wVQ5WDKON8-WATPg 1 0 2 0 10.6kb 10.6kb
+green  open .kibana_task_manager 5tIYgcmCTfmpr9OH5b38cg 1 0 2 0 45.5kb 45.5kb
+yellow open logstash-airports-1 80HuuCLGSnmXPwxQZg39Aw 1 1 7542 0   3.2mb   3.2mb
+yellow open kafka-1             XxFrrN9sSHKPO53EZu-X8A 1 1 4669 0 324.8kb 324.8kb
+```
 
 To avoid that, what I suggest is if your flows are simple and share some common characterics, you can group them into one pipeline. Even though increasing pipeline is CPU consuming, it is important to deploy multiple pipelines if you want proper configuration. In this section, we will learn how to deploy multiple pipelines.
 
-The pipelines configuration can be found at **/**
+The pipelines configuration can be found at **/etc/logstash/pipelines.yml**, modify the file to match the following lines:
+```yaml
+# This file is where you define your pipelines. You can define multiple.
+# For more information on multiple pipelines, see the documentation:
+#   https://www.elastic.co/guide/en/logstash/current/multiple-pipelines.html
+
+- pipeline.id: kafka
+  path.config: "/etc/logstash/conf.d/logstash-kafka-test.conf"
+
+- pipeline.id: airports
+  path.config: "/etc/logstash/conf.d/logstash-kafka-airports.conf"
+```
+
+Then, restart the logstash service to take the modifications into consideration.
+```bash
+# If you use systemd
+$ sudo systemctl restart logstash.service
+
+#If you use SysV
+$ sudo -i service logstash restart
+```
+You should have a result like:
+```http
+clairehuang@clairehuang-VirtualBox:~/Desktop$ http :9200/_cat/indices
+HTTP/1.1 200 OK
+content-encoding: gzip
+content-length: 237
+content-type: text/plain; charset=UTF-8
+
+yellow open kafka-1              j3f7QyawRWiws3ePl36RUQ 1 1    0 0   230b   230b
+green  open .kibana_1            gbnHPfVaT4Sh8hAyc2rU5Q 1 0    2 0 10.5kb 10.5kb
+green  open .kibana_task_manager Y04rMxaVRjOPMpXu3w6zWw 1 0    2 4 44.9kb 44.9kb
+yellow open logstash-airports-1  Fhor9__sSMGaeALtbpQeYg 1 1 7543 0  3.2mb  3.2mb
+```
+
+## Visualization on Kibana
 
 ## Stop services
 ```bash
