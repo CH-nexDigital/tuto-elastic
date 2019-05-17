@@ -2,6 +2,23 @@
 
 This is a simple tutorial to begin with Elasticsearch, Logstash and Kibana combined with Confluent Kafka.
 
+## Table of Contents
+- [start-elastic](#start-elastic)
+  - [Table of Contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [Installations](#installations)
+  - [Start services](#start-services)
+  - [Use the services](#use-the-services)
+  - [Example 1 : Ingest data into Elasticsearch with Logstash](#example-1--ingest-data-into-elasticsearch-with-logstash)
+    - [Step 1: Configure Logstash](#step-1-configure-logstash)
+    - [Step 2: Produce messages in Kafka](#step-2-produce-messages-in-kafka)
+    - [Step 3: Search messages in Elasticsearch](#step-3-search-messages-in-elasticsearch)
+      - [Simple Search](#simple-search)
+      - [Multiple keywords search](#multiple-keywords-search)
+  - [Example 2: Ingest data to Kafka](#example-2-ingest-data-to-kafka)
+      - [Handling multiple pipelines](#handling-multiple-pipelines)
+  - [Stop services](#stop-services)
+
 ## Prerequisites
 
 - Java 8
@@ -138,7 +155,7 @@ X-Content-Type-Options: nosniff
 }
 ```
 
-## Ingest data into Elasticsearch with Logstash
+## Example 1 : Ingest data into Elasticsearch with Logstash
 Let's connect Confluent Kafka and Elasticsearch with Logstash. Note that Confluent has its own Kafka Connect Elasticsearch Connector but it is only working with Elasticsearch 2.x, 5.x, or 6.x. Normally, if you followed the installation steps of this tutorial, you will get a version like 7.x, so you have to use Logstash instead of Kafka Connect Elasticsearch connector.
 
 One scenario of this part is that you have a data source that streams to Kafka and you want to index those data in Elasticsearch to make them searchable.
@@ -176,11 +193,13 @@ $ sudo -i service logstash restart
 ### Step 2: Produce messages in Kafka
 Produce some messages with the console producer.
 ```bash
-$ kafka-console-producer --broker-list locahost:9092 --topic test
+$ kafka-console-producer --broker-list localhost:9092 --topic test
 > hello world
 > hipopotamus
 > Los Angeles
 > Pokémon Detective Pikachu
+> hello Pikachu
+> Pikachu hello
 ```
 
 ### Step 3: Search messages in Elasticsearch
@@ -189,37 +208,31 @@ Try the following command to check that you have successfully ingested Kafka dat
 ```bash
 $ http :9200/_cat/indices
 ```
-![Indices](img/indices.PNG?raw=true)
-You may notice that your data have been successfully indexed to **kafka-1**. Now, try to search one word in this index.
-```bash
-$ http :9200/kafka-1/_search?q=pikachu
-```
-Your result should look like:
+You may notice that your data have been successfully indexed to **kafka-1**.
+
 ```http
 clairehuang@clairehuang-VirtualBox:~$ http :9200/_cat/indices
 HTTP/1.1 200 OK
 content-encoding: gzip
-content-length: 231
+content-length: 187
 content-type: text/plain; charset=UTF-8
 
-green  open .kibana_1            KmTc0cQNRkGdv6p_B9KjZA 1 0 2 0 10.6kb 10.6kb
-yellow open logstash-test-1      cMh-O41cQi2RKnUzkJq1ZA 1 1 0 0   283b   283b
-green  open .kibana_task_manager WOgGnUsCStmCiGgwCZlPpg 1 0 2 0 29.5kb 29.5kb
-yellow open kafka-1              Xn0Sz-2oQvuSiDmyurAuOg 1 1 4 0 14.3kb 14.3kb
-
+green  open .kibana_1            mtyWm9wVQ5WDKON8-WATPg 1 0 2 0 10.6kb 10.6kb
+green  open .kibana_task_manager 5tIYgcmCTfmpr9OH5b38cg 1 0 2 0 45.5kb 45.5kb
+yellow open kafka-1              XxFrrN9sSHKPO53EZu-X8A 1 1 6 0 17.6kb 17.6kb
 ```
 
-If you want to pass several key words at time, just put a coma between your searching key words like:
+#### Simple Search
+Now, try to search one word in this index.
 ```bash
-$ http :9200/kafka-1/_search?q=pikachu,hello
+$ http :9200/kafka-1/_search?q=hipopotamus
 ```
-You will now get two responses: one that matches "hello" and the other for "pikachu".
-
+Your result should look like:
 ```json
-clairehuang@clairehuang-VirtualBox:~$ http :9200/kafka-1/_search?q=pikachu,hello
+clairehuang@clairehuang-VirtualBox:~$ http :9200/kafka-1/_search?q=hipopotamus
 HTTP/1.1 200 OK
 content-encoding: gzip
-content-length: 318
+content-length: 265
 content-type: application/json; charset=UTF-8
 
 {
@@ -232,40 +245,157 @@ content-type: application/json; charset=UTF-8
     "hits": {
         "hits": [
             {
-                "_id": "JTrqv2oBummLXKIp2SAp",
+                "_id": "JnnnxGoBqXpp3LBZj9vH",
                 "_index": "kafka-1",
-                "_score": 1.5135659,
+                "_score": 1.9365597,
                 "_source": {
-                    "@timestamp": "2019-05-16T09:13:20.244Z",
+                    "@timestamp": "2019-05-17T08:27:51.003Z",
+                    "@version": "1",
+                    "message": "hipopotamus"
+                },
+                "_type": "_doc"
+            }
+        ],
+        "max_score": 1.9365597,
+        "total": {
+            "relation": "eq",
+            "value": 1
+        }
+    },
+    "timed_out": false,
+    "took": 17
+}
+
+```
+
+#### Multiple keywords search
+You may notice that a score is attributed to each result. Let's see what happens when there are several matching results. We will pass several key words separated by coma in the request just like:
+```bash
+$ http :9200/kafka-1/_search?q=hello,Pikachu
+```
+You will now get four responses. The two that contain both "hello" and "Pikachu" have greater score than the two that only contain one key word.
+The more one document contains searching key words, the greater is its score.
+```json
+clairehuang@clairehuang-VirtualBox:~$ http :9200/kafka-1/_search?q=hello,Pikachu
+HTTP/1.1 200 OK
+content-encoding: gzip
+content-length: 373
+content-type: application/json; charset=UTF-8
+
+{
+    "_shards": {
+        "failed": 0,
+        "skipped": 0,
+        "successful": 1,
+        "total": 1
+    },
+    "hits": {
+        "hits": [
+            {
+                "_id": "KXnnxGoBqXpp3LBZ6du9",
+                "_index": "kafka-1",
+                "_score": 1.7427702,
+                "_source": {
+                    "@timestamp": "2019-05-17T08:28:14.036Z",
+                    "@version": "1",
+                    "message": "hello Pikachu"
+                },
+                "_type": "_doc"
+            },
+            {
+                "_id": "KnnnxGoBqXpp3LBZ99uC",
+                "_index": "kafka-1",
+                "_score": 1.7427702,
+                "_source": {
+                    "@timestamp": "2019-05-17T08:28:17.562Z",
+                    "@version": "1",
+                    "message": "Pikachu hello"
+                },
+                "_type": "_doc"
+            },
+            {
+                "_id": "JXnnxGoBqXpp3LBZb9vU",
+                "_index": "kafka-1",
+                "_score": 0.8713851,
+                "_source": {
+                    "@timestamp": "2019-05-17T08:27:42.735Z",
                     "@version": "1",
                     "message": "hello world"
                 },
                 "_type": "_doc"
             },
             {
-                "_id": "KDrsv2oBummLXKIpayB6",
+                "_id": "KHnnxGoBqXpp3LBZztvJ",
                 "_index": "kafka-1",
-                "_score": 1.5135659,
+                "_score": 0.8713851,
                 "_source": {
-                    "@timestamp": "2019-05-16T09:15:03.300Z",
+                    "@timestamp": "2019-05-17T08:28:07.129Z",
                     "@version": "1",
                     "message": "Pokémon Detective Pikachu"
                 },
                 "_type": "_doc"
             }
         ],
-        "max_score": 1.5135659,
+        "max_score": 1.7427702,
         "total": {
             "relation": "eq",
-            "value": 2
+            "value": 4
         }
     },
     "timed_out": false,
     "took": 1
 }
-
-
 ```
+## Example 2: Ingest data to Kafka
+Now, we want to make searchable CSV files and ingest data to Kafka using Logstash. 
+In this example, we will consider only one CSV file. Clone this repo first, then create **sincedb** file for further use:
+```bash
+$ git clone https://github.com/nexDchuang/tuto-elastic
+$ cd tuto-elastic/data
+$ touch sincedb
+```
+As above, create a new configuration file at **/etc/logstash/conf.d/logstash-kafka-airports.conf**:
+```apache
+input {
+    file {
+        mode => "tail"
+        path => "/path/to/tuto-elastic/data/airports.csv"
+        start_position => "beginning"
+        sincedb_path => "/path/to/tuto-elastic/data/sincedb"
+    }
+}
+filter {
+    csv {
+        separator => ","
+        columns => ["Airport_ID","Name","City","Country","IATA","ICAO","Latitude","Longitude","Altitude","Timezone","DST","Tz_database_time_zone","Type","Source"]
+    }
+    prune {
+        blacklist_names => ["message","host","path"]
+    }
+}
+output {
+    elasticsearch {
+        hosts => ["localhost:9200"]
+        ilm_rollover_alias => "logstash-airports"
+        ilm_pattern => "1"
+    }
+    kafka {
+        topic_id => "logstash-airports"
+        bootstrap_servers => "localhost:9092"
+        codec => json
+    }
+}
+```
+>Don't forget to modify **path** and **sincedb_path** to the path where you cloned the repository.
+
+#### Handling multiple pipelines
+Usually, when you install Logstash there is only one pipeline configured. If you got multiple flows, you can handle them using one pipeline by injecting conditions in the configuration file. If you do not make distinction in your configuration file while using a single pipeline, your data will be mixed up and you can find some inexpected behaviors. 
+
+For example, if you restart your logstash service right now (**do not do that!**), you can have your data of flow A in you flow B and vice versa.
+
+To avoid that, what I suggest is if your flows are simple and share some common characterics, you can group them into one pipeline. Even though increasing pipeline is CPU consuming, it is important to deploy multiple pipelines if you want proper configuration. In this section, we will learn how to deploy multiple pipelines.
+
+The pipelines configuration can be found at **/**
 
 ## Stop services
 ```bash
