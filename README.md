@@ -17,7 +17,11 @@ This is a simple tutorial to begin with Elasticsearch, Logstash and Kibana combi
       - [Multiple keywords search](#multiple-keywords-search)
   - [Example 2: Ingest data to Kafka](#example-2-ingest-data-to-kafka)
       - [Handling multiple pipelines](#handling-multiple-pipelines)
+      - [Multi-fields Match and Selection](#multi-fields-match-and-selection)
+    - [Retrieve Data in Kafka](#retrieve-data-in-kafka)
   - [Visualization on Kibana](#visualization-on-kibana)
+    - [Connect Elasticsearch index to Kibana](#connect-elasticsearch-index-to-kibana)
+    - [Create Visualization](#create-visualization)
   - [Stop services](#stop-services)
 
 ## Prerequisites
@@ -87,13 +91,13 @@ Normally, if you installed the service with above commands you will get a config
 Try to hit those adresses to verify if you have a functional environment.
 ```bash
 # Ping Elasticsearch
-$ http :9200/
+$ http :9200
 
 # Ping Kibana
-$ http :5601/
+$ http :5601
 
 # Ping Logstash
-$ http :9600/
+$ http :9600
 ```
 
 You should obtain a results looking like:
@@ -355,6 +359,7 @@ $ git clone https://github.com/nexDchuang/tuto-elastic
 $ cd tuto-elastic/data
 $ touch sincedb
 ```
+**sincedb** file is used to track the current position in each file. It is useful if you don't want to ingest all data from beginning when Logstash restart but only those that were not ingested.
 
 As above, create a new configuration file at **/etc/logstash/conf.d/logstash-kafka-airports.conf**:
 ```apache
@@ -443,7 +448,137 @@ green  open .kibana_task_manager Y04rMxaVRjOPMpXu3w6zWw 1 0    2 4 44.9kb 44.9kb
 yellow open logstash-airports-1  Fhor9__sSMGaeALtbpQeYg 1 1 7543 0  3.2mb  3.2mb
 ```
 
+#### Multi-fields Match and Selection
+
+Now, let's find all Airports in Paris. We will search on **Country** and **City** fields and show only **Country**,**City** and **Name** fields in the result. 
+
+```bash
+http GET :9200/logstash-airports/_search --json <<< '{ 
+  "query": { 
+    "bool": { 
+      "must": [
+        { "match": { "Country": "France" }}, 
+        { "match": { "City": "Paris" }}  
+      ]
+    }
+  },
+  "_source":["Country","City","Name"]
+}'
+```
+The result should be like:
+```json
+HTTP/1.1 200 OK
+content-encoding: gzip
+content-length: 305
+content-type: application/json; charset=UTF-8
+
+{
+    "_shards": {
+        "failed": 0,
+        "skipped": 0,
+        "successful": 1,
+        "total": 1
+    },
+    "hits": {
+        "hits": [
+            {
+                "_id": "7tdmxmoBEHaHvh_Z2xCw",
+                "_index": "logstash-airports-1",
+                "_score": 12.103136,
+                "_source": {
+                    "City": "Paris",
+                    "Country": "France",
+                    "Name": "Paris-Le Bourget Airport"
+                },
+                "_type": "_doc"
+            },
+            {
+                "_id": "8NdmxmoBEHaHvh_Z2xCw",
+                "_index": "logstash-airports-1",
+                "_score": 12.103136,
+                "_source": {
+                    "City": "Paris",
+                    "Country": "France",
+                    "Name": "Charles de Gaulle International Airport"
+                },
+                "_type": "_doc"
+            },
+            {
+                "_id": "9NdmxmoBEHaHvh_Z2xCw",
+                "_index": "logstash-airports-1",
+                "_score": 12.103136,
+                "_source": {
+                    "City": "Paris",
+                    "Country": "France",
+                    "Name": "Paris-Orly Airport"
+                },
+                "_type": "_doc"
+            }
+        ],
+        "max_score": 12.103136,
+        "total": {
+            "relation": "eq",
+            "value": 3
+        }
+    },
+    "timed_out": false,
+    "took": 1
+}
+```
+Now, you know the basic searches. For more information about searching, please refer to the [Elasticsearch documentation page](https://www.elastic.co/guide/en/elasticsearch/reference/current/search.html).
+
+### Retrieve Data in Kafka
+
+Try the following command to check that the CSV file has been successfully ingested to Kafka.
+```bash
+$ kafka-console-consumer --bootstrap-server localhost:9092 --topic logstash-airports --from-beginning
+
+# Use --max-messages flag if you only want to check the first 10 messages
+kafka-console-consumer --bootstrap-server localhost:9092 --topic logstash-airports --from-beginning --max-messages 10
+
+```
+Messages in Kafka should look like:
+```json
+{"Source":"OurAirports","Name":"Kangerlussuaq Airport","City":"Sondrestrom","Altitude":"165","Longitude":"-50.7116031647","Timezone":"-3","Tz_database_time_zone":"America/Godthab","IATA":"SFJ","@version":"1","@timestamp":"2019-05-17T12:43:04.679Z","Latitude":"67.0122218992","DST":"E","ICAO":"BGSF","Type":"airport","Country":"Greenland","Airport_ID":"9"}
+{"Source":"OurAirports","Name":"Keflavik International Airport","City":"Keflavik","Altitude":"171","Longitude":"-22.605600357056","Timezone":"0","Tz_database_time_zone":"Atlantic/Reykjavik","IATA":"KEF","@version":"1","@timestamp":"2019-05-17T12:43:04.681Z","Latitude":"63.985000610352","DST":"N","ICAO":"BIKF","Type":"airport","Country":"Iceland","Airport_ID":"16"}
+{"Source":"OurAirports","Name":"Reykjavik Airport","City":"Reykjavik","Altitude":"48","Longitude":"-21.9405994415","Timezone":"0","Tz_database_time_zone":"Atlantic/Reykjavik","IATA":"RKV","@version":"1","@timestamp":"2019-05-17T12:43:04.682Z","Latitude":"64.1299972534","DST":"N","ICAO":"BIRK","Type":"airport","Country":"Iceland","Airport_ID":"18"}
+{"Source":"OurAirports","Name":"Pond Inlet Airport","City":"Pond Inlet","Altitude":"181","Longitude":"-77.9666976929","Timezone":"-5","Tz_database_time_zone":"America/Toronto","IATA":"YIO","@version":"1","@timestamp":"2019-05-17T12:43:04.695Z","Latitude":"72.6832962036","DST":"A","ICAO":"CYIO","Type":"airport","Country":"Canada","Airport_ID":"75"}
+{"Source":"OurAirports","Name":"Schefferville Airport","City":"Schefferville","Altitude":"1709","Longitude":"-66.8052978515625","Timezone":"-5","Tz_database_time_zone":"America/Toronto","IATA":"YKL","@version":"1","@timestamp":"2019-05-17T12:43:04.696Z","Latitude":"54.805301666259766","DST":"A","ICAO":"CYKL","Type":"airport","Country":"Canada","Airport_ID":"80"}
+{"Source":"OurAirports","Name":"San Pedro Airport","City":"San Pedro","Altitude":"26","Longitude":"-6.660820007324219","Timezone":"0","Tz_database_time_zone":"Africa/Abidjan","IATA":"SPY","@version":"1","@timestamp":"2019-05-17T12:43:04.740Z","Latitude":"4.746719837188721","DST":"N","ICAO":"DISP","Type":"airport","Country":"Cote d'Ivoire","Airport_ID":"258"}
+{"Source":"OurAirports","Name":"Yamoussoukro Airport","City":"Yamoussoukro","Altitude":"699","Longitude":"-5.36558008194","Timezone":"0","Tz_database_time_zone":"Africa/Abidjan","IATA":"ASK","@version":"1","@timestamp":"2019-05-17T12:43:04.740Z","Latitude":"6.9031701088","DST":"N","ICAO":"DIYO","Type":"airport","Country":"Cote d'Ivoire","Airport_ID":"259"}
+{"Source":"OurAirports","Name":"Nnamdi Azikiwe International Airport","City":"Abuja","Altitude":"1123","Longitude":"7.263169765472412","Timezone":"1","Tz_database_time_zone":"Africa/Lagos","IATA":"ABV","@version":"1","@timestamp":"2019-05-17T12:43:04.740Z","Latitude":"9.006790161132812","DST":"N","ICAO":"DNAA","Type":"airport","Country":"Nigeria","Airport_ID":"260"}
+{"Source":"OurAirports","Name":"Akure Airport","City":"Akure","Altitude":"1100","Longitude":"5.3010101318359375","Timezone":"1","Tz_database_time_zone":"Africa/Lagos","IATA":"AKR","@version":"1","@timestamp":"2019-05-17T12:43:04.740Z","Latitude":"7.246739864349365","DST":"N","ICAO":"DNAK","Type":"airport","Country":"Nigeria","Airport_ID":"261"}
+{"Source":"OurAirports","Name":"Benin Airport","City":"Benin","Altitude":"258","Longitude":"5.5995001792907715","Timezone":"1","Tz_database_time_zone":"Africa/Lagos","IATA":"BNI","@version":"1","@timestamp":"2019-05-17T12:43:04.741Z","Latitude":"6.316979885101318","DST":"N","ICAO":"DNBE","Type":"airport","Country":"Nigeria","Airport_ID":"262"}
+```
+As you can see, it is hard to visualize our data. In next section, we will learn how to use Kibana to easily visualize data.
+
 ## Visualization on Kibana
+First, you have to navigate to <http://localhost:5601> with your web browser.
+
+### Connect Elasticsearch index to Kibana
+Kibana uses index patterns to retrieve data from Elasticsearch indices for things like visualizations.
+First, on the left Menu Bar, click on **Management** (the last button) or navigate directly to <http://localhost:5601/kibana#/management>.
+Then, on click on **Kibana > Index Patterns > Create index pattern**.
+
+In **Step 1 of 2: Define index pattern**, enter **logstash-airports-1** and for the next step, select **@timestamp** as **The Time field Name**. Create the index pattern.
+
+To visualize your data, navigate to <http://localhost:5601/kibana#/discover> directly or by clicking the **Discover** button in the left menu bar.
+If you finished the previous section during the last 15 minutes, you will see the data traffic directly when you navigate to the Discover page. Otherwise, you have to configure the time filter to find the time period during when the data was introduced to Elasticsearch.
+
+Typically, you will find:
+![Discover Data](img/discover.PNG?raw=true)
+
+### Create Visualization
+
+Let's create a Pie Chart that indicates the airports distribution through countries.
+Click on **Visualize** button of the left side bar, then click on **Create a visualization** and select **Pie** chart. Choose **logstash-airports-1** as the source of this chart. Once you validated, select **Split Slices** as buckets type. After that, choose **Terms** in **Aggregation** field and fill the form as follow:
+
+![Pie Chart Configuration](img/pie-conf.PNG?raw=true)
+
+When you finished, click on the **Apply Changes** button to get you pie chart like bellow:
+![Pie Chart](img/pie.PNG?raw=true)
+
+You can save this visualization and add it to the Kibana Dashboard.
 
 ## Stop services
 ```bash
